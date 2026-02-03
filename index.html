@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>拼图游戏 - Puzzle Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>🧩 拼图游戏</h1>
+            <div class="game-controls-top">
+                <select id="difficulty" class="difficulty-select" title="难度选择">
+                    <option value="3">3×3 简单</option>
+                    <option value="4" selected>4×4 中等</option>
+                    <option value="5">5×5 困难</option>
+                </select>
+                <button id="preview-btn" class="icon-btn" title="预览原图">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <path d="M21 15l-5-5L5 21"></path>
+                    </svg>
+                </button>
+                <button id="shuffle-btn" class="icon-btn" title="重新开始">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"></path>
+                        <path d="M1 20v-6h6"></path>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="score-board">
+                <div class="score">
+                    <span class="label">步数:</span>
+                    <span id="moves">0</span>
+                </div>
+                <div class="time">
+                    <span class="label">时间:</span>
+                    <span id="time">00:00</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-wrapper">
+            <div id="puzzle-board" class="puzzle-board"></div>
+            <div id="preview-overlay" class="preview-overlay">
+                <div class="preview-content">
+                    <h3>原图预览</h3>
+                    <button id="close-preview" class="btn primary">关闭</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="win-overlay" class="win-overlay hidden">
+            <div class="win-content">
+                <h2>🎉 恭喜完成!</h2>
+                <p id="win-message">你用了 XX 步和 XX 时间完成了拼图</p>
+                <button id="play-again" class="btn primary">再玩一次</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <p>点击空白方块相邻的方块进行移动</p>
+            <p>将所有方块按顺序排列即可获胜</p>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
