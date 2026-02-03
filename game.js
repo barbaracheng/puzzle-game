@@ -7,7 +7,9 @@ class PuzzleGame {
         this.timer = null;
         this.seconds = 0;
         this.isPlaying = false;
+        this.isPaused = false;
         this.originalImage = null;
+        this.tileImages = [];
         
         this.init();
     }
@@ -20,8 +22,7 @@ class PuzzleGame {
 
     setupEventListeners() {
         document.getElementById('difficulty').addEventListener('change', (e) => {
-            this.size = parseInt(e.target.value);
-            this.resetGame();
+            this.handleDifficultyChange(e.target.value);
         });
 
         document.getElementById('shuffle-btn').addEventListener('click', () => {
@@ -40,6 +41,120 @@ class PuzzleGame {
             this.hideWin();
             this.resetGame();
         });
+
+        // Upload image functionality
+        const uploadBtn = document.getElementById('upload-btn');
+        const imageInput = document.getElementById('image-input');
+        
+        uploadBtn.addEventListener('click', () => {
+            imageInput.click();
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                this.handleImageUpload(e.target.files[0]);
+            }
+        });
+
+        // Pause/Resume functionality
+        const pauseBtn = document.getElementById('pause-btn');
+        pauseBtn.addEventListener('click', () => {
+            this.togglePause();
+        });
+    }
+
+    handleDifficultyChange(newSize) {
+        if (this.isPlaying && !this.isPaused) {
+            // If game is in progress, ask for confirmation
+            if (confirm('游戏正在进行中，切换难度将重新开始游戏，确定要继续吗？')) {
+                this.size = parseInt(newSize);
+                this.resetGame();
+            } else {
+                // Revert the select to current size
+                document.getElementById('difficulty').value = this.size;
+            }
+        } else {
+            // Game not started or paused, allow change
+            this.size = parseInt(newSize);
+            this.resetGame();
+        }
+    }
+
+    handleImageUpload(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.originalImage = e.target.result;
+            this.createTileImages();
+            this.resetGame();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    createTileImages() {
+        if (!this.originalImage) {
+            this.tileImages = [];
+            return;
+        }
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Make sure image is square
+            const size = Math.min(img.width, img.height);
+            canvas.width = size / this.size;
+            canvas.height = size / this.size;
+            
+            this.tileImages = [];
+            
+            for (let row = 0; row < this.size; row++) {
+                for (let col = 0; col < this.size; col++) {
+                    // Draw the portion of image for this tile
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(
+                        img,
+                        (col * img.width) / this.size,
+                        (row * img.height) / this.size,
+                        img.width / this.size,
+                        img.height / this.size,
+                        0,
+                        0,
+                        canvas.width,
+                        canvas.height
+                    );
+                    
+                    this.tileImages.push(canvas.toDataURL());
+                }
+            }
+            
+            // Update board with images
+            this.updateBoardWithImages();
+        };
+        
+        img.src = this.originalImage;
+    }
+
+    updateBoardWithImages() {
+        if (this.tileImages.length === 0) return;
+        
+        const totalTiles = this.size * this.size;
+        for (let i = 0; i < totalTiles; i++) {
+            const tile = this.tiles[i];
+            if (tile.value !== 0) {
+                // Use image instead of text
+                const imageIndex = tile.value - 1;
+                if (this.tileImages[imageIndex]) {
+                    tile.element.style.backgroundImage = `url(${this.tileImages[imageIndex]})`;
+                    tile.element.style.backgroundSize = 'cover';
+                    tile.element.style.backgroundPosition = 'center';
+                    tile.element.textContent = '';
+                    tile.element.classList.add('has-image');
+                }
+            }
+        }
     }
 
     createBoard() {
@@ -53,6 +168,7 @@ class PuzzleGame {
         for (let i = 0; i < totalTiles; i++) {
             const tile = document.createElement('div');
             tile.className = 'puzzle-tile';
+            tile.dataset.index = i;
             
             if (i === totalTiles - 1) {
                 tile.className += ' empty';
@@ -60,69 +176,87 @@ class PuzzleGame {
                 this.emptyIndex = i;
             } else {
                 tile.textContent = i + 1;
-                tile.addEventListener('click', () => this.handleTileClick(i));
             }
             
             this.tiles.push({
                 element: tile,
                 currentIndex: i,
                 correctIndex: i,
-                value: i
+                value: i === totalTiles - 1 ? 0 : i
             });
 
             board.appendChild(tile);
         }
-    }
-
-    handleTileClick(clickedValue) {
-        if (!this.isPlaying) {
-            this.startTimer();
-            this.isPlaying = true;
+        
+        // Apply images if they exist
+        if (this.originalImage) {
+            this.createTileImages();
         }
-
-        const clickedIndex = this.tiles.findIndex(t => t.value === clickedValue);
-        this.moveTile(clickedIndex);
     }
 
-    moveTile(index) {
-        if (!this.canMove(index)) return;
+    handleTileClick(tileIndex) {
+        if (!this.isPlaying || this.isPaused) return;
+        
+        this.moveTile(tileIndex);
+    }
+
+    moveTile(tileIndex) {
+        if (!this.canMove(tileIndex)) return;
 
         const emptyPos = this.getTilePosition(this.emptyIndex);
-        const tilePos = this.getTilePosition(index);
+        const tilePos = this.getTilePosition(tileIndex);
 
         const distance = Math.abs(emptyPos.row - tilePos.row) + 
                         Math.abs(emptyPos.col - tilePos.col);
 
         if (distance !== 1) return;
 
-        // Swap tiles
-        const emptyElement = this.tiles[this.emptyIndex].element;
-        const tileElement = this.tiles[index].element;
+        // Get the tile at the clicked index
+        const clickedTile = this.tiles[tileIndex];
+        const emptyTile = this.tiles[this.emptyIndex];
 
-        // Swap elements in the DOM
-        const temp = emptyElement.innerHTML;
-        emptyElement.innerHTML = tileElement.innerHTML;
-        emptyElement.className = tileElement.className;
-        emptyElement.className = emptyElement.className.replace(' empty', '');
-        
-        tileElement.innerHTML = '';
-        tileElement.className = 'puzzle-tile empty';
+        // Swap values
+        const tempValue = clickedTile.value;
+        clickedTile.value = emptyTile.value;
+        emptyTile.value = tempValue;
 
-        // Update event listeners
-        const emptyValue = this.tiles[this.emptyIndex].value;
-        const tileValue = this.tiles[index].value;
+        // Update the DOM
+        if (clickedTile.value === 0) {
+            clickedTile.element.className = 'puzzle-tile empty';
+            clickedTile.element.textContent = '';
+            clickedTile.element.style.backgroundImage = '';
+            clickedTile.element.style.backgroundSize = '';
+            clickedTile.element.style.backgroundPosition = '';
+        } else {
+            clickedTile.element.className = 'puzzle-tile';
+            clickedTile.element.textContent = clickedTile.value + 1;
+            
+            // Apply image if exists
+            if (this.originalImage && this.tileImages[clickedTile.value]) {
+                clickedTile.element.style.backgroundImage = `url(${this.tileImages[clickedTile.value]})`;
+                clickedTile.element.style.backgroundSize = 'cover';
+                clickedTile.element.style.backgroundPosition = 'center';
+                clickedTile.element.textContent = '';
+                clickedTile.element.classList.add('has-image');
+            }
+        }
 
-        this.tiles[this.emptyIndex].value = tileValue;
-        this.tiles[index].value = emptyValue;
+        if (emptyTile.value !== 0) {
+            emptyTile.element.className = 'puzzle-tile';
+            emptyTile.element.textContent = emptyTile.value + 1;
+            
+            // Apply image if exists
+            if (this.originalImage && this.tileImages[emptyTile.value]) {
+                emptyTile.element.style.backgroundImage = `url(${this.tileImages[emptyTile.value]})`;
+                emptyTile.element.style.backgroundSize = 'cover';
+                emptyTile.element.style.backgroundPosition = 'center';
+                emptyTile.element.textContent = '';
+                emptyTile.element.classList.add('has-image');
+            }
+        }
 
-        this.tiles[this.emptyIndex].element.addEventListener('click', () => 
-            this.handleTileClick(this.tiles[this.emptyIndex].value));
-
-        // Remove event listener from empty tile
-        const newEmptyIndex = index;
-        this.tiles[newEmptyIndex].element.removeEventListener('click', () => {});
-
-        this.emptyIndex = newEmptyIndex;
+        // Update empty index
+        this.emptyIndex = tileIndex;
 
         this.moves++;
         this.updateMoves();
@@ -130,9 +264,9 @@ class PuzzleGame {
         this.checkWin();
     }
 
-    canMove(index) {
+    canMove(tileIndex) {
         const emptyPos = this.getTilePosition(this.emptyIndex);
-        const tilePos = this.getTilePosition(index);
+        const tilePos = this.getTilePosition(tileIndex);
 
         const distance = Math.abs(emptyPos.row - tilePos.row) + 
                         Math.abs(emptyPos.col - tilePos.col);
@@ -147,22 +281,55 @@ class PuzzleGame {
         };
     }
 
+    togglePause() {
+        if (!this.isPlaying) return;
+        
+        this.isPaused = !this.isPaused;
+        
+        const pauseIcon = document.getElementById('pause-icon');
+        const playIcon = document.getElementById('play-icon');
+        const board = document.getElementById('puzzle-board');
+        
+        if (this.isPaused) {
+            pauseIcon.style.display = 'none';
+            playIcon.style.display = 'block';
+            this.stopTimer();
+            board.classList.add('paused');
+        } else {
+            pauseIcon.style.display = 'block';
+            playIcon.style.display = 'none';
+            this.startTimer();
+            board.classList.remove('paused');
+        }
+    }
+
     shuffle() {
         // Reset state
         this.moves = 0;
         this.seconds = 0;
         this.isPlaying = false;
+        this.isPaused = false;
         this.stopTimer();
         this.updateMoves();
         this.updateTimer();
         this.hideWin();
+        
+        // Reset pause button
+        const pauseIcon = document.getElementById('pause-icon');
+        const playIcon = document.getElementById('play-icon');
+        pauseIcon.style.display = 'block';
+        playIcon.style.display = 'none';
+        document.getElementById('puzzle-board').classList.remove('paused');
+
+        // Create board first
+        this.createBoard();
 
         // Create solvable shuffle
         const totalTiles = this.size * this.size;
         const shuffledValues = [];
         
         for (let i = 0; i < totalTiles - 1; i++) {
-            shuffledValues.push(i + 1);
+            shuffledValues.push(i);
         }
         shuffledValues.push(0); // 0 represents empty
 
@@ -193,22 +360,36 @@ class PuzzleGame {
         } while (!this.isSolvable(inversions, emptyRowFromBottom));
 
         // Apply shuffled values to board
-        const board = document.getElementById('puzzle-board');
         for (let i = 0; i < totalTiles; i++) {
             const value = shuffledValues[i];
             const tile = this.tiles[i];
             
+            tile.value = value;
+            
             if (value === 0) {
                 tile.element.className = 'puzzle-tile empty';
-                tile.element.innerHTML = '';
-                tile.value = 0;
+                tile.element.textContent = '';
+                tile.element.style.backgroundImage = '';
+                tile.element.style.backgroundSize = '';
+                tile.element.style.backgroundPosition = '';
                 this.emptyIndex = i;
             } else {
                 tile.element.className = 'puzzle-tile';
-                tile.element.textContent = value;
-                tile.value = value;
-                tile.element.addEventListener('click', () => this.handleTileClick(value));
+                
+                // Apply image if exists
+                if (this.originalImage && this.tileImages[value]) {
+                    tile.element.style.backgroundImage = `url(${this.tileImages[value]})`;
+                    tile.element.style.backgroundSize = 'cover';
+                    tile.element.style.backgroundPosition = 'center';
+                    tile.element.textContent = '';
+                    tile.element.classList.add('has-image');
+                } else {
+                    tile.element.textContent = value + 1;
+                }
             }
+            
+            // Add click event listener
+            tile.element.onclick = () => this.handleTileClick(i);
         }
     }
 
@@ -231,7 +412,7 @@ class PuzzleGame {
         const totalTiles = this.size * this.size;
         
         for (let i = 0; i < totalTiles; i++) {
-            const expectedValue = (i === totalTiles - 1) ? 0 : i + 1;
+            const expectedValue = (i === totalTiles - 1) ? 0 : i;
             if (this.tiles[i].value !== expectedValue) {
                 return false;
             }
@@ -239,6 +420,7 @@ class PuzzleGame {
 
         this.stopTimer();
         this.isPlaying = false;
+        this.isPaused = false;
         this.showWin();
         return true;
     }
@@ -258,6 +440,50 @@ class PuzzleGame {
     }
 
     showPreview() {
+        const previewContainer = document.getElementById('preview-image-container');
+        previewContainer.innerHTML = '';
+        
+        if (this.originalImage) {
+            // Show the original image
+            const img = document.createElement('img');
+            img.src = this.originalImage;
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '400px';
+            img.style.borderRadius = '10px';
+            previewContainer.appendChild(img);
+        } else {
+            // Show the number tiles in correct order
+            const previewBoard = document.createElement('div');
+            previewBoard.className = 'preview-board';
+            previewBoard.style.display = 'grid';
+            previewBoard.style.gridTemplateColumns = `repeat(${this.size}, 1fr)`;
+            previewBoard.style.gap = '4px';
+            previewBoard.style.padding = '8px';
+            previewBoard.style.background = 'rgba(0, 0, 0, 0.3)';
+            previewBoard.style.borderRadius = '15px';
+            previewBoard.style.aspectRatio = '1';
+            previewBoard.style.maxWidth = '300px';
+            previewBoard.style.margin = '0 auto';
+            
+            const totalTiles = this.size * this.size;
+            for (let i = 0; i < totalTiles; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'puzzle-tile';
+                tile.style.fontSize = `${1.5 - (this.size * 0.1)}em`;
+                
+                if (i === totalTiles - 1) {
+                    tile.className += ' empty';
+                    tile.textContent = '';
+                } else {
+                    tile.textContent = i + 1;
+                }
+                
+                previewBoard.appendChild(tile);
+            }
+            
+            previewContainer.appendChild(previewBoard);
+        }
+        
         document.getElementById('preview-overlay').classList.add('visible');
     }
 
@@ -266,7 +492,7 @@ class PuzzleGame {
     }
 
     startTimer() {
-        if (this.timer) return;
+        if (this.timer || this.isPaused) return;
         this.timer = setInterval(() => {
             this.seconds++;
             this.updateTimer();
