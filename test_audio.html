@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频测试 - Puzzle Game Audio Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1a1a2e 50%, #0f172a 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #6366f1;
+            margin-bottom: 30px;
+        }
+
+        .test-section {
+            background: #1e293b;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .test-section h2 {
+            color: #10b981;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #6366f1;
+            color: white;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #8b5cf6;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .status.success {
+            border-left: 4px solid #22c55e;
+        }
+
+        .status.error {
+            border-left: 4px solid #ef4444;
+        }
+
+        .status.info {
+            border-left: 4px solid #3b82f6;
+        }
+
+        .volume-control {
+            margin-top: 15px;
+        }
+
+        .volume-control label {
+            display: block;
+            margin-bottom: 10px;
+            color: #94a3b8;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .volume-value {
+            display: inline-block;
+            min-width: 50px;
+            text-align: right;
+            font-weight: bold;
+            color: #6366f1;
+        }
+
+        .log {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #6366f1;
+            padding-left: 10px;
+        }
+
+        .log-entry.success {
+            border-left-color: #22c55e;
+            color: #86efac;
+        }
+
+        .log-entry.error {
+            border-left-color: #ef4444;
+            color: #fca5a5;
+        }
+
+        .info {
+            background: rgba(59, 130, 246, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 拼图游戏音频系统测试</h1>
+
+        <div class="info">
+            <p>此页面用于测试拼图游戏的音频系统功能。</p>
+            <p><strong>注意：</strong>首次播放音频需要用户交互，请点击"初始化音频系统"按钮。</p>
+        </div>
+
+        <!-- 初始化测试 -->
+        <div class="test-section">
+            <h2>1. 音频系统初始化</h2>
+            <div class="test-buttons">
+                <button id="init-btn">初始化音频系统</button>
+            </div>
+            <div id="init-status" class="status info">
+                状态: 未初始化
+            </div>
+        </div>
+
+        <!-- 音效测试 -->
+        <div class="test-section">
+            <h2>2. 音效测试</h2>
+            <div class="test-buttons">
+                <button id="move-sound-btn" disabled>播放移动音效</button>
+                <button id="click-sound-btn" disabled>播放点击音效</button>
+                <button id="win-sound-btn" disabled>播放胜利音效</button>
+            </div>
+            <div id="sfx-status" class="status info">
+                音效状态: 未就绪
+            </div>
+        </div>
+
+        <!-- 背景音乐测试 -->
+        <div class="test-section">
+            <h2>3. 背景音乐测试</h2>
+            <div class="test-buttons">
+                <button id="play-music-btn" disabled>播放背景音乐</button>
+                <button id="stop-music-btn" disabled>停止背景音乐</button>
+            </div>
+            <div id="music-status" class="status info">
+                背景音乐: 停止
+            </div>
+        </div>
+
+        <!-- 音量控制测试 -->
+        <div class="test-section">
+            <h2>4. 音量控制测试</h2>
+            <div class="volume-control">
+                <label>
+                    主音量: <input type="range" id="master-volume" min="0" max="100" value="50">
+                    <span class="volume-value" id="master-volume-value">50</span>
+                </label>
+            </div>
+            <div class="volume-control">
+                <label>
+                    音效音量: <input type="range" id="sfx-volume" min="0" max="100" value="60">
+                    <span class="volume-value" id="sfx-volume-value">60</span>
+                </label>
+            </div>
+            <div class="volume-control">
+                <label>
+                    背景音乐音量: <input type="range" id="music-volume" min="0" max="100" value="40">
+                    <span class="volume-value" id="music-volume-value">40</span>
+                </label>
+            </div>
+            <div id="volume-status" class="status info">
+                当前音量: 主音量 50%, 音效 60%, 音乐 40%
+            </div>
+        </div>
+
+        <!-- 开关控制测试 -->
+        <div class="test-section">
+            <h2>5. 开关控制测试</h2>
+            <div class="test-buttons">
+                <button id="toggle-sound-btn" disabled>切换音效开关</button>
+                <button id="toggle-music-btn" disabled>切换音乐开关</button>
+            </div>
+            <div id="toggle-status" class="status info">
+                音效: 开启 | 音乐: 关闭
+            </div>
+        </div>
+
+        <!-- 日志 -->
+        <div class="test-section">
+            <h2>测试日志</h2>
+            <div id="log" class="log">
+                <div class="log-entry">等待测试开始...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="audio-manager.js"></script>
+    <script>
+        const audioManager = new AudioManager();
+
+        // 日志工具
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 初始化按钮
+        document.getElementById('init-btn').addEventListener('click', async () => {
+            log('开始初始化音频系统...', 'info');
+
+            try {
+                await audioManager.init();
+                log('✅ 音频系统初始化成功', 'success');
+
+                // 更新状态
+                document.getElementById('init-status').className = 'status success';
+                document.getElementById('init-status').textContent = '状态: ✅ 初始化成功';
+
+                // 启用按钮
+                document.getElementById('move-sound-btn').disabled = false;
+                document.getElementById('click-sound-btn').disabled = false;
+                document.getElementById('win-sound-btn').disabled = false;
+                document.getElementById('play-music-btn').disabled = false;
+                document.getElementById('toggle-sound-btn').disabled = false;
+                document.getElementById('toggle-music-btn').disabled = false;
+
+                document.getElementById('sfx-status').className = 'status success';
+                document.getElementById('sfx-status').textContent = '音效状态: ✅ 就绪';
+
+                log('所有测试按钮已启用', 'success');
+            } catch (error) {
+                log(`❌ 音频系统初始化失败: ${error.message}`, 'error');
+
+                document.getElementById('init-status').className = 'status error';
+                document.getElementById('init-status').textContent = `状态: ❌ 失败 - ${error.message}`;
+            }
+        });
+
+        // 移动音效按钮
+        document.getElementById('move-sound-btn').addEventListener('click', () => {
+            audioManager.playMoveSound();
+            log('🎵 播放移动音效', 'success');
+        });
+
+        // 点击音效按钮
+        document.getElementById('click-sound-btn').addEventListener('click', () => {
+            audioManager.playClickSound();
+            log('🎵 播放点击音效', 'success');
+        });
+
+        // 胜利音效按钮
+        document.getElementById('win-sound-btn').addEventListener('click', () => {
+            audioManager.playWinSound();
+            log('🎵 播放胜利音效', 'success');
+        });
+
+        // 播放背景音乐按钮
+        document.getElementById('play-music-btn').addEventListener('click', () => {
+            audioManager.playBackgroundMusic();
+
+            document.getElementById('music-status').className = 'status success';
+            document.getElementById('music-status').textContent = '背景音乐: ✅ 播放中';
+
+            document.getElementById('stop-music-btn').disabled = false;
+            log('🎶 开始播放背景音乐', 'success');
+        });
+
+        // 停止背景音乐按钮
+        document.getElementById('stop-music-btn').addEventListener('click', () => {
+            audioManager.stopBackgroundMusic();
+
+            document.getElementById('music-status').className = 'status info';
+            document.getElementById('music-status').textContent = '背景音乐: ⏸️ 已停止（淡出中）';
+
+            document.getElementById('stop-music-btn').disabled = true;
+            log('⏸️ 停止背景音乐（2秒淡出）', 'info');
+        });
+
+        // 音量控制
+        document.getElementById('master-volume').addEventListener('input', (e) => {
+            const value = e.target.value;
+            document.getElementById('master-volume-value').textContent = value;
+            audioManager.setMasterVolume(value);
+            updateVolumeStatus();
+            log(`🔊 主音量设置为 ${value}%`, 'info');
+        });
+
+        document.getElementById('sfx-volume').addEventListener('input', (e) => {
+            const value = e.target.value;
+            document.getElementById('sfx-volume-value').textContent = value;
+            audioManager.setSfxVolume(value);
+            updateVolumeStatus();
+            log(`🔊 音效音量设置为 ${value}%`, 'info');
+        });
+
+        document.getElementById('music-volume').addEventListener('input', (e) => {
+            const value = e.target.value;
+            document.getElementById('music-volume-value').textContent = value;
+            audioManager.setMusicVolume(value);
+            updateVolumeStatus();
+            log(`🔊 音乐音量设置为 ${value}%`, 'info');
+        });
+
+        function updateVolumeStatus() {
+            const volumes = audioManager.getVolumes();
+            document.getElementById('volume-status').textContent =
+                `当前音量: 主音量 ${volumes.master}%, 音效 ${volumes.sfx}%, 音乐 ${volumes.music}%`;
+        }
+
+        // 开关控制
+        document.getElementById('toggle-sound-btn').addEventListener('click', () => {
+            const enabled = audioManager.toggleSound();
+            const status = enabled ? '开启' : '关闭';
+            document.getElementById('toggle-status').textContent =
+                `音效: ${enabled ? '✅ 开启' : '❌ 关闭'} | 音乐: ${audioManager.musicEnabled ? '✅ 开启' : '❌ 关闭'}`;
+            log(`🔇 音效已${status}`, enabled ? 'success' : 'info');
+        });
+
+        document.getElementById('toggle-music-btn').addEventListener('click', () => {
+            const enabled = audioManager.toggleMusic();
+            const status = enabled ? '开启' : '关闭';
+
+            if (enabled) {
+                document.getElementById('music-status').className = 'status success';
+                document.getElementById('music-status').textContent = '背景音乐: ✅ 播放中';
+                document.getElementById('stop-music-btn').disabled = false;
+            } else {
+                document.getElementById('music-status').className = 'status info';
+                document.getElementById('music-status').textContent = '背景音乐: ⏸️ 已停止';
+                document.getElementById('stop-music-btn').disabled = true;
+            }
+
+            document.getElementById('toggle-status').textContent =
+                `音效: ${audioManager.soundEnabled ? '✅ 开启' : '❌ 关闭'} | 音乐: ${enabled ? '✅ 开启' : '❌ 关闭'}`;
+            log(`🔇 背景音乐已${status}`, enabled ? 'success' : 'info');
+        });
+
+        log('测试页面已加载，请点击"初始化音频系统"开始测试', 'info');
+    </script>
+</body>
+</html>

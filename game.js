@@ -12,12 +12,11 @@ class PuzzleGame {
         this.tileImages = [];
         this.gameStarted = false; // 新增：游戏是否已开始的标志
 
-        // 音效和音乐相关
-        this.soundEnabled = true;
-        this.musicEnabled = false;
-        this.musicVolume = 0.5;
-        this.audioContext = null;
-        this.backgroundMusic = null;
+        // 音频管理器
+        this.audioManager = new AudioManager();
+        this.audioManager.onError = (message) => {
+            this.showToast(message);
+        };
 
         this.init();
     }
@@ -26,6 +25,12 @@ class PuzzleGame {
         this.setupEventListeners();
         this.createBoard();
         this.shuffle();
+
+        // 初始化音量图标
+        const volumeSlider = document.getElementById('volume-slider');
+        if (volumeSlider) {
+            this.updateVolumeIcon(volumeSlider.value);
+        }
     }
 
     setupEventListeners() {
@@ -99,6 +104,15 @@ class PuzzleGame {
         if (volumeSlider) {
             volumeSlider.addEventListener('input', (e) => {
                 this.setVolume(e.target.value);
+                this.updateVolumeIcon(e.target.value);
+            });
+        }
+
+        // Volume button toggle functionality
+        const volumeBtn = document.getElementById('volume-btn');
+        if (volumeBtn) {
+            volumeBtn.addEventListener('click', () => {
+                this.toggleVolumeControl();
             });
         }
     }
@@ -529,10 +543,15 @@ class PuzzleGame {
     }
 
     // 开始游戏
-    startGame() {
+    async startGame() {
         this.gameStarted = true;
         this.isPlaying = true;
         this.isPaused = false;
+
+        // 初始化音频管理器
+        if (!this.audioManager.isInitialized) {
+            await this.audioManager.init();
+        }
 
         // 更新按钮状态为"结束游戏"
         const startBtnText = document.getElementById('start-btn-text');
@@ -588,13 +607,13 @@ class PuzzleGame {
 
     // 音效开关
     toggleSound() {
-        this.soundEnabled = !this.soundEnabled;
+        const enabled = this.audioManager.toggleSound();
 
         const soundOnIcon = document.getElementById('sound-on-icon');
         const soundOffIcon = document.getElementById('sound-off-icon');
         const soundBtn = document.getElementById('sound-btn');
 
-        if (this.soundEnabled) {
+        if (enabled) {
             soundOnIcon.style.display = 'block';
             soundOffIcon.style.display = 'none';
             soundBtn.style.color = 'var(--primary-color)';
@@ -608,173 +627,80 @@ class PuzzleGame {
     }
 
     // 音乐开关
-    toggleMusic() {
-        this.musicEnabled = !this.musicEnabled;
+    async toggleMusic() {
+        // 初始化音频管理器（如果是第一次）
+        if (!this.audioManager.isInitialized) {
+            await this.audioManager.init();
+        }
+
+        const enabled = this.audioManager.toggleMusic();
 
         const musicOnIcon = document.getElementById('music-on-icon');
         const musicOffIcon = document.getElementById('music-off-icon');
         const musicBtn = document.getElementById('music-btn');
 
-        if (this.musicEnabled) {
-            // 初始化音频上下文（如果是第一次）
-            this.initAudioContext();
-
+        if (enabled) {
             musicOnIcon.style.display = 'block';
             musicOffIcon.style.display = 'none';
             musicBtn.style.color = 'var(--primary-color)';
-
-            // 播放背景音乐
-            this.playBackgroundMusic();
             this.showToast('背景音乐已开启');
         } else {
             musicOnIcon.style.display = 'none';
             musicOffIcon.style.display = 'block';
             musicBtn.style.color = 'var(--text-secondary)';
-
-            // 停止背景音乐
-            this.stopBackgroundMusic();
             this.showToast('背景音乐已关闭');
         }
     }
 
     // 设置音量
     setVolume(value) {
-        this.musicVolume = value / 100;
+        this.audioManager.setMasterVolume(value);
+    }
 
-        if (this.backgroundMusic) {
-            this.backgroundMusic.volume = this.musicVolume;
+    // 切换音量控制显示
+    toggleVolumeControl() {
+        const volumeControl = document.getElementById('volume-control');
+        if (volumeControl) {
+            const isHidden = volumeControl.style.display === 'none';
+            volumeControl.style.display = isHidden ? 'flex' : 'none';
         }
     }
 
-    // 初始化音频上下文
-    initAudioContext() {
-        if (!this.audioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
+    // 更新音量图标
+    updateVolumeIcon(volume) {
+        const volumeHighIcon = document.getElementById('volume-high-icon');
+        const volumeLowIcon = document.getElementById('volume-low-icon');
+        const volumeMuteIcon = document.getElementById('volume-mute-icon');
+        const volumeBtn = document.getElementById('volume-btn');
 
-        // 确保音频上下文已恢复（用户交互后）
-        if (this.audioContext.state === 'suspended') {
-            this.audioContext.resume();
+        if (!volumeHighIcon || !volumeLowIcon || !volumeMuteIcon || !volumeBtn) return;
+
+        // 隐藏所有图标
+        volumeHighIcon.style.display = 'none';
+        volumeLowIcon.style.display = 'none';
+        volumeMuteIcon.style.display = 'none';
+
+        // 根据音量显示对应图标
+        if (volume == 0) {
+            volumeMuteIcon.style.display = 'block';
+            volumeBtn.style.color = 'var(--text-secondary)';
+        } else if (volume < 50) {
+            volumeLowIcon.style.display = 'block';
+            volumeBtn.style.color = 'var(--primary-color)';
+        } else {
+            volumeHighIcon.style.display = 'block';
+            volumeBtn.style.color = 'var(--primary-color)';
         }
     }
 
     // 播放移动音效
-    playMoveSound() {
-        if (!this.soundEnabled) return;
-
-        try {
-            this.initAudioContext();
-
-            // 创建振荡器生成"咔嗒"声
-            const oscillator = this.audioContext.createOscillator();
-            const gainNode = this.audioContext.createGain();
-
-            oscillator.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
-
-            // 设置频率和音量
-            oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(400, this.audioContext.currentTime + 0.1);
-
-            gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
-
-            // 播放音效
-            oscillator.start(this.audioContext.currentTime);
-            oscillator.stop(this.audioContext.currentTime + 0.1);
-        } catch (e) {
-            console.error('播放音效失败:', e);
-        }
-    }
-
-    // 播放背景音乐
-    playBackgroundMusic() {
-        if (!this.musicEnabled || this.backgroundMusic) return;
-
-        try {
-            // 创建音频元素
-            this.backgroundMusic = new Audio();
-            this.backgroundMusic.volume = this.musicVolume;
-            this.backgroundMusic.loop = true;
-
-            // 使用免费的在线背景音乐
-            // 这里使用一个简单的平静背景音乐URL
-            // 实际项目中应该使用本地音频文件
-            this.backgroundMusic.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAADAAAIhgC4MCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAADAAAIhgC4MCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-
-            // 如果data URI不可用，创建一个简单的背景音
-            this.createBackgroundMusic();
-
-            this.backgroundMusic.play().catch(e => {
-                console.error('播放背景音乐失败:', e);
-            });
-        } catch (e) {
-            console.error('初始化背景音乐失败:', e);
-        }
-    }
-
-    // 创建背景音乐（使用Web Audio API生成简单的背景音）
-    createBackgroundMusic() {
-        try {
-            this.initAudioContext();
-
-            // 创建一个简单的背景音乐循环
-            const bufferSize = 2 * this.audioContext.sampleRate;
-            const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
-            const data = buffer.getChannelData(0);
-
-            // 生成简单的和弦
-            const frequencies = [261.63, 329.63, 392.00]; // C大调和弦
-
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = 0;
-                for (let j = 0; j < frequencies.length; j++) {
-                    data[i] += Math.sin(2 * Math.PI * frequencies[j] * (i / this.audioContext.sampleRate));
-                }
-                data[i] /= frequencies.length;
-                data[i] *= 0.1; // 降低音量
-            }
-
-            // 创建源节点
-            const source = this.audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.loop = true;
-
-            // 创建增益节点
-            const gainNode = this.audioContext.createGain();
-            gainNode.gain.value = this.musicVolume * 0.5;
-
-            // 连接节点
-            source.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
-
-            // 保存引用
-            this.backgroundMusicSource = source;
-            this.backgroundMusicGain = gainNode;
-
-            // 播放
-            source.start();
-        } catch (e) {
-            console.error('创建背景音乐失败:', e);
-        }
-    }
-
-    // 停止背景音乐
-    stopBackgroundMusic() {
-        if (this.backgroundMusic) {
-            this.backgroundMusic.pause();
-            this.backgroundMusic = null;
+    async playMoveSound() {
+        // 确保音频管理器已初始化
+        if (!this.audioManager.isInitialized) {
+            await this.audioManager.init();
         }
 
-        if (this.backgroundMusicSource) {
-            try {
-                this.backgroundMusicSource.stop();
-            } catch (e) {
-                // 忽略已经停止的错误
-            }
-            this.backgroundMusicSource = null;
-            this.backgroundMusicGain = null;
-        }
+        this.audioManager.playMoveSound();
     }
 
     // 新增：开始游戏
@@ -803,7 +729,7 @@ class PuzzleGame {
         this.showToast('游戏开始！点击空白格相邻的方块进行移动');
     }
 
-    checkWin() {
+    async checkWin() {
         const totalTiles = this.size * this.size;
 
         for (let i = 0; i < totalTiles; i++) {
@@ -832,6 +758,9 @@ class PuzzleGame {
         if (stopIcon) {
             stopIcon.style.display = 'none';
         }
+
+        // 播放胜利音效
+        this.audioManager.playWinSound();
 
         this.showWin();
         return true;
