@@ -9,9 +9,9 @@ class AudioManager {
 
         // 音频状态
         this.soundEnabled = true;
-        this.musicEnabled = false;
-        this.masterVolume = 0.5;
-        this.sfxVolume = 0.6;
+        this.musicEnabled = true;  // 修复：默认开启背景音乐
+        this.masterVolume = 0.8;  // 修复：提高主音量（0.5 -> 0.8）
+        this.sfxVolume = 1.0;  // 修复：提高音效音量（0.6 -> 1.0）
         this.musicVolume = 0.4;
 
         // 音频源
@@ -28,6 +28,9 @@ class AudioManager {
 
         // 事件回调
         this.onError = null;
+
+        // 加载保存的设置
+        this.loadSettings();
     }
 
     /**
@@ -328,6 +331,10 @@ class AudioManager {
      */
     toggleSound() {
         this.soundEnabled = !this.soundEnabled;
+
+        // 保存设置
+        this.saveSettings();
+
         return this.soundEnabled;
     }
 
@@ -343,6 +350,9 @@ class AudioManager {
             this.stopBackgroundMusic();
         }
 
+        // 保存设置
+        this.saveSettings();
+
         return this.musicEnabled;
     }
 
@@ -357,6 +367,9 @@ class AudioManager {
         if (this.backgroundMusicGain) {
             this.backgroundMusicGain.gain.value = this.musicVolume * this.masterVolume;
         }
+
+        // 保存设置
+        this.saveSettings();
     }
 
     /**
@@ -365,6 +378,9 @@ class AudioManager {
      */
     setSfxVolume(value) {
         this.sfxVolume = value / 100;
+
+        // 保存设置
+        this.saveSettings();
     }
 
     /**
@@ -377,6 +393,9 @@ class AudioManager {
         if (this.backgroundMusicGain) {
             this.backgroundMusicGain.gain.value = this.musicVolume * this.masterVolume;
         }
+
+        // 保存设置
+        this.saveSettings();
     }
 
     /**
@@ -389,6 +408,54 @@ class AudioManager {
             sfx: Math.round(this.sfxVolume * 100),
             music: Math.round(this.musicVolume * 100)
         };
+    }
+
+    /**
+     * 保存设置到localStorage
+     */
+    saveSettings() {
+        const settings = {
+            soundEnabled: this.soundEnabled,
+            musicEnabled: this.musicEnabled,
+            masterVolume: Math.round(this.masterVolume * 100),
+            sfxVolume: Math.round(this.sfxVolume * 100),
+            musicVolume: Math.round(this.musicVolume * 100)
+        };
+        try {
+            localStorage.setItem('puzzleGameAudioSettings', JSON.stringify(settings));
+            console.log('音频设置已保存');
+        } catch (error) {
+            console.warn('保存音频设置失败:', error);
+        }
+    }
+
+    /**
+     * 从localStorage加载设置
+     */
+    loadSettings() {
+        try {
+            const settings = JSON.parse(localStorage.getItem('puzzleGameAudioSettings'));
+            if (settings) {
+                if (typeof settings.soundEnabled === 'boolean') {
+                    this.soundEnabled = settings.soundEnabled;
+                }
+                if (typeof settings.musicEnabled === 'boolean') {
+                    this.musicEnabled = settings.musicEnabled;
+                }
+                if (typeof settings.masterVolume === 'number') {
+                    this.masterVolume = settings.masterVolume / 100;
+                }
+                if (typeof settings.sfxVolume === 'number') {
+                    this.sfxVolume = settings.sfxVolume / 100;
+                }
+                if (typeof settings.musicVolume === 'number') {
+                    this.musicVolume = settings.musicVolume / 100;
+                }
+                console.log('音频设置已加载');
+            }
+        } catch (error) {
+            console.warn('加载音频设置失败:', error);
+        }
     }
 
     /**

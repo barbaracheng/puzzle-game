@@ -26,10 +26,54 @@ class PuzzleGame {
         this.createBoard();
         this.shuffle();
 
+        // 同步音量UI状态（从AudioManager加载的设置）
+        this.syncAudioUI();
+
         // 初始化音量图标
-        const volumeSlider = document.getElementById('volume-slider');
-        if (volumeSlider) {
-            this.updateVolumeIcon(volumeSlider.value);
+        const volumes = this.audioManager.getVolumes();
+        if (volumes && volumes.master !== undefined) {
+            const volumeSlider = document.getElementById('volume-slider');
+            if (volumeSlider) {
+                volumeSlider.value = volumes.master;
+                this.updateVolumeIcon(volumes.master);
+            }
+        }
+    }
+
+    /**
+     * 同步音频UI状态（根据AudioManager的设置）
+     */
+    syncAudioUI() {
+        const state = this.audioManager.getState();
+
+        // 同步音效按钮状态
+        const soundOnIcon = document.getElementById('sound-on-icon');
+        const soundOffIcon = document.getElementById('sound-off-icon');
+        const soundBtn = document.getElementById('sound-btn');
+
+        if (state.soundEnabled) {
+            soundOnIcon.style.display = 'block';
+            soundOffIcon.style.display = 'none';
+            soundBtn.style.color = 'var(--primary-color)';
+        } else {
+            soundOnIcon.style.display = 'none';
+            soundOffIcon.style.display = 'block';
+            soundBtn.style.color = 'var(--text-secondary)';
+        }
+
+        // 同步音乐按钮状态
+        const musicOnIcon = document.getElementById('music-on-icon');
+        const musicOffIcon = document.getElementById('music-off-icon');
+        const musicBtn = document.getElementById('music-btn');
+
+        if (state.musicEnabled) {
+            musicOnIcon.style.display = 'block';
+            musicOffIcon.style.display = 'none';
+            musicBtn.style.color = 'var(--primary-color)';
+        } else {
+            musicOnIcon.style.display = 'none';
+            musicOffIcon.style.display = 'block';
+            musicBtn.style.color = 'var(--text-secondary)';
         }
     }
 
@@ -551,6 +595,11 @@ class PuzzleGame {
         // 初始化音频管理器
         if (!this.audioManager.isInitialized) {
             await this.audioManager.init();
+        }
+
+        // 修复：自动播放背景音乐（如果音乐已启用）
+        if (this.audioManager.musicEnabled) {
+            this.audioManager.playBackgroundMusic();
         }
 
         // 更新按钮状态为"结束游戏"
