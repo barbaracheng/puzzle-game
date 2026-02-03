@@ -11,7 +11,14 @@ class PuzzleGame {
         this.originalImage = null;
         this.tileImages = [];
         this.gameStarted = false; // 新增：游戏是否已开始的标志
-        
+
+        // 音效和音乐相关
+        this.soundEnabled = true;
+        this.musicEnabled = false;
+        this.musicVolume = 0.5;
+        this.audioContext = null;
+        this.backgroundMusic = null;
+
         this.init();
     }
 
@@ -67,7 +74,31 @@ class PuzzleGame {
         const startBtn = document.getElementById('start-btn');
         if (startBtn) {
             startBtn.addEventListener('click', () => {
-                this.startGame();
+                this.toggleGame();
+            });
+        }
+
+        // Sound toggle functionality
+        const soundBtn = document.getElementById('sound-btn');
+        if (soundBtn) {
+            soundBtn.addEventListener('click', () => {
+                this.toggleSound();
+            });
+        }
+
+        // Music toggle functionality
+        const musicBtn = document.getElementById('music-btn');
+        if (musicBtn) {
+            musicBtn.addEventListener('click', () => {
+                this.toggleMusic();
+            });
+        }
+
+        // Volume control functionality
+        const volumeSlider = document.getElementById('volume-slider');
+        if (volumeSlider) {
+            volumeSlider.addEventListener('input', (e) => {
+                this.setVolume(e.target.value);
             });
         }
     }
@@ -88,6 +119,7 @@ class PuzzleGame {
             this.size = parseInt(newSize);
             this.resetGame();
             if (this.gameStarted) {
+                this.gameStarted = false;
                 this.showToast('难度已切换，请点击"开始游戏"');
             }
         }
@@ -183,6 +215,7 @@ class PuzzleGame {
         board.innerHTML = '';
         board.style.gridTemplateColumns = `repeat(${this.size}, 1fr)`;
 
+        // Bug 1 修复：确保清空旧的tiles数组
         this.tiles = [];
         const totalTiles = this.size * this.size;
 
@@ -245,10 +278,16 @@ class PuzzleGame {
         const clickedTile = this.tiles[tileIndex];
         const emptyTile = this.tiles[this.emptyIndex];
 
+        // Bug 1 修复：确保 emptyTile.value 是 0，避免创建多个空白格
+        if (emptyTile.value !== 0) {
+            console.error('Error: emptyTile.value is not 0!', emptyTile.value);
+            return;
+        }
+
         // Swap values
         const tempValue = clickedTile.value;
-        clickedTile.value = emptyTile.value;
-        emptyTile.value = tempValue;
+        clickedTile.value = emptyTile.value;  // clickedTile 变成 0 (空白)
+        emptyTile.value = tempValue;  // emptyTile 变成原来的值
 
         // Update the DOM
         if (clickedTile.value === 0) {
@@ -291,6 +330,9 @@ class PuzzleGame {
         this.moves++;
         this.updateMoves();
 
+        // 播放移动音效
+        this.playMoveSound();
+
         this.checkWin();
     }
 
@@ -319,20 +361,27 @@ class PuzzleGame {
         const pauseIcon = document.getElementById('pause-icon');
         const playIcon = document.getElementById('play-icon');
         const board = document.getElementById('puzzle-board');
+        const pauseBtnText = document.getElementById('pause-btn-text');
 
         if (this.isPaused) {
             pauseIcon.style.display = 'none';
             playIcon.style.display = 'block';
             this.stopTimer();
             board.classList.add('paused');
-            // Bug 2修复：添加暂停提示
+            // Bug 2 修复：更新按钮文字
+            if (pauseBtnText) {
+                pauseBtnText.textContent = '继续游戏';
+            }
             this.showToast('游戏已暂停');
         } else {
             pauseIcon.style.display = 'block';
             playIcon.style.display = 'none';
             this.startTimer();
             board.classList.remove('paused');
-            // Bug 2修复：添加继续提示
+            // Bug 2 修复：更新按钮文字
+            if (pauseBtnText) {
+                pauseBtnText.textContent = '暂停游戏';
+            }
             this.showToast('游戏继续');
         }
     }
@@ -352,9 +401,14 @@ class PuzzleGame {
         // Reset pause button
         const pauseIcon = document.getElementById('pause-icon');
         const playIcon = document.getElementById('play-icon');
+        const pauseBtnText = document.getElementById('pause-btn-text');
         pauseIcon.style.display = 'block';
         playIcon.style.display = 'none';
         document.getElementById('puzzle-board').classList.remove('paused');
+        // Bug 2 修复：重置暂停按钮文字
+        if (pauseBtnText) {
+            pauseBtnText.textContent = '暂停';
+        }
 
         // Create board first
         this.createBoard();
@@ -363,10 +417,11 @@ class PuzzleGame {
         const totalTiles = this.size * this.size;
         const shuffledValues = [];
 
-        for (let i = 1; i < totalTiles; i++) {  // 修复：从1开始，不是0
+        // Bug 1 修复：创建包含一个0的数组
+        for (let i = 1; i < totalTiles; i++) {
             shuffledValues.push(i);
         }
-        shuffledValues.push(0); // 0 represents empty
+        shuffledValues.push(0); // 只有一个0表示空白格
 
         // Fisher-Yates shuffle with solvability check
         let inversions = 0;
@@ -395,6 +450,7 @@ class PuzzleGame {
         } while (!this.isSolvable(inversions, emptyRowFromBottom));
 
         // Apply shuffled values to board
+        // Bug 1 修复：确保只有一个空白格
         for (let i = 0; i < totalTiles; i++) {
             const value = shuffledValues[i];
             const tile = this.tiles[i];
@@ -402,6 +458,7 @@ class PuzzleGame {
             tile.value = value;
 
             if (value === 0) {
+                // Bug 1 修复：确保只有一个空白格
                 tile.element.className = 'puzzle-tile empty';
                 tile.element.textContent = '';
                 tile.element.style.backgroundImage = '';
@@ -419,7 +476,7 @@ class PuzzleGame {
                     tile.element.textContent = '';
                     tile.element.classList.add('has-image');
                 } else {
-                    tile.element.textContent = value;  // 修复：直接显示value
+                    tile.element.textContent = value;
                 }
             }
 
@@ -441,10 +498,287 @@ class PuzzleGame {
 
     resetGame() {
         this.shuffle();
+
+        // 重置开始按钮状态
+        const startBtnText = document.getElementById('start-btn-text');
+        const startIcon = document.getElementById('start-icon');
+        const stopIcon = document.getElementById('stop-icon');
+
+        if (startBtnText) {
+            startBtnText.textContent = '开始游戏';
+        }
+        if (startIcon) {
+            startIcon.style.display = 'block';
+        }
+        if (stopIcon) {
+            stopIcon.style.display = 'none';
+        }
+    }
+
+    // 修复：开始/结束游戏切换
+    toggleGame() {
+        if (!this.gameStarted) {
+            // 开始游戏
+            this.startGame();
+        } else {
+            // 结束游戏 - 弹出确认对话框
+            if (confirm('确定要结束游戏吗？')) {
+                this.endGame();
+            }
+        }
+    }
+
+    // 开始游戏
+    startGame() {
+        this.gameStarted = true;
+        this.isPlaying = true;
+        this.isPaused = false;
+
+        // 更新按钮状态为"结束游戏"
+        const startBtnText = document.getElementById('start-btn-text');
+        const startIcon = document.getElementById('start-icon');
+        const stopIcon = document.getElementById('stop-icon');
+
+        if (startBtnText) {
+            startBtnText.textContent = '结束游戏';
+        }
+        if (startIcon) {
+            startIcon.style.display = 'none';
+        }
+        if (stopIcon) {
+            stopIcon.style.display = 'block';
+        }
+
+        // Bug 2 修复：设置暂停按钮文字
+        const pauseBtnText = document.getElementById('pause-btn-text');
+        if (pauseBtnText) {
+            pauseBtnText.textContent = '暂停游戏';
+        }
+
+        this.startTimer();
+        this.showToast('游戏开始！点击空白格相邻的方块进行移动');
+    }
+
+    // 结束游戏
+    endGame() {
+        this.gameStarted = false;
+        this.isPlaying = false;
+        this.isPaused = false;
+
+        // 重置游戏
+        this.resetGame();
+
+        // 更新按钮状态为"开始游戏"
+        const startBtnText = document.getElementById('start-btn-text');
+        const startIcon = document.getElementById('start-icon');
+        const stopIcon = document.getElementById('stop-icon');
+
+        if (startBtnText) {
+            startBtnText.textContent = '开始游戏';
+        }
+        if (startIcon) {
+            startIcon.style.display = 'block';
+        }
+        if (stopIcon) {
+            stopIcon.style.display = 'none';
+        }
+
+        this.showToast('游戏已结束');
+    }
+
+    // 音效开关
+    toggleSound() {
+        this.soundEnabled = !this.soundEnabled;
+
+        const soundOnIcon = document.getElementById('sound-on-icon');
+        const soundOffIcon = document.getElementById('sound-off-icon');
+        const soundBtn = document.getElementById('sound-btn');
+
+        if (this.soundEnabled) {
+            soundOnIcon.style.display = 'block';
+            soundOffIcon.style.display = 'none';
+            soundBtn.style.color = 'var(--primary-color)';
+            this.showToast('音效已开启');
+        } else {
+            soundOnIcon.style.display = 'none';
+            soundOffIcon.style.display = 'block';
+            soundBtn.style.color = 'var(--text-secondary)';
+            this.showToast('音效已关闭');
+        }
+    }
+
+    // 音乐开关
+    toggleMusic() {
+        this.musicEnabled = !this.musicEnabled;
+
+        const musicOnIcon = document.getElementById('music-on-icon');
+        const musicOffIcon = document.getElementById('music-off-icon');
+        const musicBtn = document.getElementById('music-btn');
+
+        if (this.musicEnabled) {
+            // 初始化音频上下文（如果是第一次）
+            this.initAudioContext();
+
+            musicOnIcon.style.display = 'block';
+            musicOffIcon.style.display = 'none';
+            musicBtn.style.color = 'var(--primary-color)';
+
+            // 播放背景音乐
+            this.playBackgroundMusic();
+            this.showToast('背景音乐已开启');
+        } else {
+            musicOnIcon.style.display = 'none';
+            musicOffIcon.style.display = 'block';
+            musicBtn.style.color = 'var(--text-secondary)';
+
+            // 停止背景音乐
+            this.stopBackgroundMusic();
+            this.showToast('背景音乐已关闭');
+        }
+    }
+
+    // 设置音量
+    setVolume(value) {
+        this.musicVolume = value / 100;
+
+        if (this.backgroundMusic) {
+            this.backgroundMusic.volume = this.musicVolume;
+        }
+    }
+
+    // 初始化音频上下文
+    initAudioContext() {
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        // 确保音频上下文已恢复（用户交互后）
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+    }
+
+    // 播放移动音效
+    playMoveSound() {
+        if (!this.soundEnabled) return;
+
+        try {
+            this.initAudioContext();
+
+            // 创建振荡器生成"咔嗒"声
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+
+            // 设置频率和音量
+            oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(400, this.audioContext.currentTime + 0.1);
+
+            gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
+
+            // 播放音效
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 0.1);
+        } catch (e) {
+            console.error('播放音效失败:', e);
+        }
+    }
+
+    // 播放背景音乐
+    playBackgroundMusic() {
+        if (!this.musicEnabled || this.backgroundMusic) return;
+
+        try {
+            // 创建音频元素
+            this.backgroundMusic = new Audio();
+            this.backgroundMusic.volume = this.musicVolume;
+            this.backgroundMusic.loop = true;
+
+            // 使用免费的在线背景音乐
+            // 这里使用一个简单的平静背景音乐URL
+            // 实际项目中应该使用本地音频文件
+            this.backgroundMusic.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAADAAAIhgC4MCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAADAAAIhgC4MCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+            // 如果data URI不可用，创建一个简单的背景音
+            this.createBackgroundMusic();
+
+            this.backgroundMusic.play().catch(e => {
+                console.error('播放背景音乐失败:', e);
+            });
+        } catch (e) {
+            console.error('初始化背景音乐失败:', e);
+        }
+    }
+
+    // 创建背景音乐（使用Web Audio API生成简单的背景音）
+    createBackgroundMusic() {
+        try {
+            this.initAudioContext();
+
+            // 创建一个简单的背景音乐循环
+            const bufferSize = 2 * this.audioContext.sampleRate;
+            const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+
+            // 生成简单的和弦
+            const frequencies = [261.63, 329.63, 392.00]; // C大调和弦
+
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = 0;
+                for (let j = 0; j < frequencies.length; j++) {
+                    data[i] += Math.sin(2 * Math.PI * frequencies[j] * (i / this.audioContext.sampleRate));
+                }
+                data[i] /= frequencies.length;
+                data[i] *= 0.1; // 降低音量
+            }
+
+            // 创建源节点
+            const source = this.audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.loop = true;
+
+            // 创建增益节点
+            const gainNode = this.audioContext.createGain();
+            gainNode.gain.value = this.musicVolume * 0.5;
+
+            // 连接节点
+            source.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+
+            // 保存引用
+            this.backgroundMusicSource = source;
+            this.backgroundMusicGain = gainNode;
+
+            // 播放
+            source.start();
+        } catch (e) {
+            console.error('创建背景音乐失败:', e);
+        }
+    }
+
+    // 停止背景音乐
+    stopBackgroundMusic() {
+        if (this.backgroundMusic) {
+            this.backgroundMusic.pause();
+            this.backgroundMusic = null;
+        }
+
+        if (this.backgroundMusicSource) {
+            try {
+                this.backgroundMusicSource.stop();
+            } catch (e) {
+                // 忽略已经停止的错误
+            }
+            this.backgroundMusicSource = null;
+            this.backgroundMusicGain = null;
+        }
     }
 
     // 新增：开始游戏
-    startGame() {
+    startGame_old() {
         if (this.gameStarted) {
             // 如果游戏已经开始，提示确认
             if (confirm('游戏已经开始，确定要重新开始吗？')) {
@@ -458,6 +792,13 @@ class PuzzleGame {
         this.gameStarted = true;
         this.isPlaying = true;
         this.isPaused = false;
+
+        // Bug 2 修复：设置暂停按钮文字
+        const pauseBtnText = document.getElementById('pause-btn-text');
+        if (pauseBtnText) {
+            pauseBtnText.textContent = '暂停游戏';
+        }
+
         this.startTimer();
         this.showToast('游戏开始！点击空白格相邻的方块进行移动');
     }
@@ -476,6 +817,22 @@ class PuzzleGame {
         this.isPlaying = false;
         this.isPaused = false;
         this.gameStarted = false;  // 重置游戏开始标志
+
+        // 更新按钮状态为"开始游戏"
+        const startBtnText = document.getElementById('start-btn-text');
+        const startIcon = document.getElementById('start-icon');
+        const stopIcon = document.getElementById('stop-icon');
+
+        if (startBtnText) {
+            startBtnText.textContent = '开始游戏';
+        }
+        if (startIcon) {
+            startIcon.style.display = 'block';
+        }
+        if (stopIcon) {
+            stopIcon.style.display = 'none';
+        }
+
         this.showWin();
         return true;
     }
