@@ -27,7 +27,7 @@
 
 ## 🚀 在线游玩
 
-[点击这里开始游戏](https://barbaracheng.github.io/puzzle-game/)
+🎮 **游戏地址：** https://barbaracheng.github.io/puzzle-game/
 
 ## 🛠️ 本地运行
 
