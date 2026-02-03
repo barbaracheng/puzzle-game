@@ -47,6 +47,12 @@
                         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                     </svg>
                 </button>
+                <button id="start-btn" class="btn primary start-btn" title="开始游戏">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px;">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    开始游戏
+                </button>
             </div>
             <div class="score-board">
                 <div class="score">
@@ -62,6 +68,12 @@
         
         <div class="game-wrapper">
             <div id="puzzle-board" class="puzzle-board"></div>
+            <div id="pause-overlay" class="pause-overlay">
+                <div class="pause-content">
+                    <h3>⏸️ 已暂停</h3>
+                    <p>点击暂停按钮继续游戏</p>
+                </div>
+            </div>
             <div id="preview-overlay" class="preview-overlay">
                 <div class="preview-content">
                     <h3>原图预览</h3>

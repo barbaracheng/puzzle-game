@@ -159,8 +159,113 @@ body {
 }
 
 .puzzle-board.paused {
-    opacity: 0.3;
+    opacity: 0.5;
     pointer-events: none;
+}
+
+/* Pause overlay */
+.pause-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    border-radius: 15px;
+    backdrop-filter: blur(5px);
+}
+
+.puzzle-board.paused + .pause-overlay {
+    display: flex;
+}
+
+.pause-content {
+    text-align: center;
+    color: white;
+    animation: fadeIn 0.3s ease;
+}
+
+.pause-content h3 {
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.pause-content p {
+    font-size: 1.1em;
+    color: var(--text-secondary);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Start button */
+.start-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    font-size: 0.95em;
+    min-width: 120px;
+}
+
+.start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+}
+
+/* Toast message */
+.toast-message {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    padding: 12px 30px;
+    border-radius: 25px;
+    font-size: 1em;
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    z-index: 2000;
+    animation: toastSlide 0.3s ease;
+    pointer-events: none;
+}
+
+.toast-message.fade-out {
+    animation: toastFade 0.3s ease;
+}
+
+@keyframes toastSlide {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes toastFade {
+    from {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
 }
 
 .puzzle-tile {
@@ -388,6 +493,17 @@ body {
     .difficulty-select {
         font-size: 0.85em;
         padding: 8px 12px;
+    }
+
+    .start-btn {
+        padding: 8px 15px;
+        font-size: 0.85em;
+        min-width: 100px;
+    }
+
+    .start-btn svg {
+        width: 18px;
+        height: 18px;
     }
 
     .score span:last-child, .time span:last-child {

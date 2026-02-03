@@ -10,6 +10,7 @@ class PuzzleGame {
         this.isPaused = false;
         this.originalImage = null;
         this.tileImages = [];
+        this.gameStarted = false; // 新增：游戏是否已开始的标志
         
         this.init();
     }
@@ -45,7 +46,7 @@ class PuzzleGame {
         // Upload image functionality
         const uploadBtn = document.getElementById('upload-btn');
         const imageInput = document.getElementById('image-input');
-        
+
         uploadBtn.addEventListener('click', () => {
             imageInput.click();
         });
@@ -61,6 +62,14 @@ class PuzzleGame {
         pauseBtn.addEventListener('click', () => {
             this.togglePause();
         });
+
+        // Start game functionality
+        const startBtn = document.getElementById('start-btn');
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                this.startGame();
+            });
+        }
     }
 
     handleDifficultyChange(newSize) {
@@ -69,6 +78,7 @@ class PuzzleGame {
             if (confirm('游戏正在进行中，切换难度将重新开始游戏，确定要继续吗？')) {
                 this.size = parseInt(newSize);
                 this.resetGame();
+                this.showToast('难度已切换，请点击"开始游戏"');
             } else {
                 // Revert the select to current size
                 document.getElementById('difficulty').value = this.size;
@@ -77,15 +87,26 @@ class PuzzleGame {
             // Game not started or paused, allow change
             this.size = parseInt(newSize);
             this.resetGame();
+            if (this.gameStarted) {
+                this.showToast('难度已切换，请点击"开始游戏"');
+            }
         }
     }
 
     handleImageUpload(file) {
+        // 检查是否为图片文件
+        if (!file.type.startsWith('image/')) {
+            this.showToast('请上传图片文件！');
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = (e) => {
             this.originalImage = e.target.result;
             this.createTileImages();
-            this.resetGame();
+            // 上传图片后重置游戏状态，但保持gameStarted为false
+            this.shuffle();
+            this.showToast('图片上传成功！点击"开始游戏"开始拼图');
         };
         reader.readAsDataURL(file);
     }
@@ -182,7 +203,7 @@ class PuzzleGame {
                 element: tile,
                 currentIndex: i,
                 correctIndex: i,
-                value: i === totalTiles - 1 ? 0 : i
+                value: i === totalTiles - 1 ? 0 : i + 1  // 修复：非空白格的value应该是i+1
             });
 
             board.appendChild(tile);
@@ -195,7 +216,16 @@ class PuzzleGame {
     }
 
     handleTileClick(tileIndex) {
-        if (!this.isPlaying || this.isPaused) return;
+        // Bug 3修复：添加未开始和暂停状态的提示
+        if (!this.isPlaying) {
+            this.showToast('请点击"开始游戏"按钮！');
+            return;
+        }
+        
+        if (this.isPaused) {
+            this.showToast('游戏已暂停，请点击继续');
+            return;
+        }
         
         this.moveTile(tileIndex);
     }
@@ -206,7 +236,7 @@ class PuzzleGame {
         const emptyPos = this.getTilePosition(this.emptyIndex);
         const tilePos = this.getTilePosition(tileIndex);
 
-        const distance = Math.abs(emptyPos.row - tilePos.row) + 
+        const distance = Math.abs(emptyPos.row - tilePos.row) +
                         Math.abs(emptyPos.col - tilePos.col);
 
         if (distance !== 1) return;
@@ -229,11 +259,11 @@ class PuzzleGame {
             clickedTile.element.style.backgroundPosition = '';
         } else {
             clickedTile.element.className = 'puzzle-tile';
-            clickedTile.element.textContent = clickedTile.value + 1;
+            clickedTile.element.textContent = clickedTile.value;  // 修复：直接显示value，不需要+1
             
-            // Apply image if exists
-            if (this.originalImage && this.tileImages[clickedTile.value]) {
-                clickedTile.element.style.backgroundImage = `url(${this.tileImages[clickedTile.value]})`;
+            // Apply image if exists (value从1开始，所以image索引是value-1)
+            if (this.originalImage && this.tileImages[clickedTile.value - 1]) {
+                clickedTile.element.style.backgroundImage = `url(${this.tileImages[clickedTile.value - 1]})`;
                 clickedTile.element.style.backgroundSize = 'cover';
                 clickedTile.element.style.backgroundPosition = 'center';
                 clickedTile.element.textContent = '';
@@ -243,11 +273,11 @@ class PuzzleGame {
 
         if (emptyTile.value !== 0) {
             emptyTile.element.className = 'puzzle-tile';
-            emptyTile.element.textContent = emptyTile.value + 1;
+            emptyTile.element.textContent = emptyTile.value;  // 修复：直接显示value，不需要+1
             
-            // Apply image if exists
-            if (this.originalImage && this.tileImages[emptyTile.value]) {
-                emptyTile.element.style.backgroundImage = `url(${this.tileImages[emptyTile.value]})`;
+            // Apply image if exists (value从1开始，所以image索引是value-1)
+            if (this.originalImage && this.tileImages[emptyTile.value - 1]) {
+                emptyTile.element.style.backgroundImage = `url(${this.tileImages[emptyTile.value - 1]})`;
                 emptyTile.element.style.backgroundSize = 'cover';
                 emptyTile.element.style.backgroundPosition = 'center';
                 emptyTile.element.textContent = '';
@@ -283,23 +313,27 @@ class PuzzleGame {
 
     togglePause() {
         if (!this.isPlaying) return;
-        
+
         this.isPaused = !this.isPaused;
-        
+
         const pauseIcon = document.getElementById('pause-icon');
         const playIcon = document.getElementById('play-icon');
         const board = document.getElementById('puzzle-board');
-        
+
         if (this.isPaused) {
             pauseIcon.style.display = 'none';
             playIcon.style.display = 'block';
             this.stopTimer();
             board.classList.add('paused');
+            // Bug 2修复：添加暂停提示
+            this.showToast('游戏已暂停');
         } else {
             pauseIcon.style.display = 'block';
             playIcon.style.display = 'none';
             this.startTimer();
             board.classList.remove('paused');
+            // Bug 2修复：添加继续提示
+            this.showToast('游戏继续');
         }
     }
 
@@ -309,11 +343,12 @@ class PuzzleGame {
         this.seconds = 0;
         this.isPlaying = false;
         this.isPaused = false;
+        this.gameStarted = false; // 重置游戏开始标志
         this.stopTimer();
         this.updateMoves();
         this.updateTimer();
         this.hideWin();
-        
+
         // Reset pause button
         const pauseIcon = document.getElementById('pause-icon');
         const playIcon = document.getElementById('play-icon');
@@ -327,8 +362,8 @@ class PuzzleGame {
         // Create solvable shuffle
         const totalTiles = this.size * this.size;
         const shuffledValues = [];
-        
-        for (let i = 0; i < totalTiles - 1; i++) {
+
+        for (let i = 1; i < totalTiles; i++) {  // 修复：从1开始，不是0
             shuffledValues.push(i);
         }
         shuffledValues.push(0); // 0 represents empty
@@ -336,7 +371,7 @@ class PuzzleGame {
         // Fisher-Yates shuffle with solvability check
         let inversions = 0;
         let emptyRowFromBottom = 0;
-        
+
         do {
             for (let i = shuffledValues.length - 2; i >= 1; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -347,7 +382,7 @@ class PuzzleGame {
             inversions = 0;
             for (let i = 0; i < shuffledValues.length; i++) {
                 for (let j = i + 1; j < shuffledValues.length; j++) {
-                    if (shuffledValues[i] > shuffledValues[j] && 
+                    if (shuffledValues[i] > shuffledValues[j] &&
                         shuffledValues[i] !== 0 && shuffledValues[j] !== 0) {
                         inversions++;
                     }
@@ -363,9 +398,9 @@ class PuzzleGame {
         for (let i = 0; i < totalTiles; i++) {
             const value = shuffledValues[i];
             const tile = this.tiles[i];
-            
+
             tile.value = value;
-            
+
             if (value === 0) {
                 tile.element.className = 'puzzle-tile empty';
                 tile.element.textContent = '';
@@ -375,19 +410,19 @@ class PuzzleGame {
                 this.emptyIndex = i;
             } else {
                 tile.element.className = 'puzzle-tile';
-                
-                // Apply image if exists
-                if (this.originalImage && this.tileImages[value]) {
-                    tile.element.style.backgroundImage = `url(${this.tileImages[value]})`;
+
+                // Apply image if exists (value从1开始，所以image索引是value-1)
+                if (this.originalImage && this.tileImages[value - 1]) {
+                    tile.element.style.backgroundImage = `url(${this.tileImages[value - 1]})`;
                     tile.element.style.backgroundSize = 'cover';
                     tile.element.style.backgroundPosition = 'center';
                     tile.element.textContent = '';
                     tile.element.classList.add('has-image');
                 } else {
-                    tile.element.textContent = value + 1;
+                    tile.element.textContent = value;  // 修复：直接显示value
                 }
             }
-            
+
             // Add click event listener
             tile.element.onclick = () => this.handleTileClick(i);
         }
@@ -408,11 +443,30 @@ class PuzzleGame {
         this.shuffle();
     }
 
+    // 新增：开始游戏
+    startGame() {
+        if (this.gameStarted) {
+            // 如果游戏已经开始，提示确认
+            if (confirm('游戏已经开始，确定要重新开始吗？')) {
+                this.shuffle();
+                this.gameStarted = false;
+                this.startGame();
+            }
+            return;
+        }
+
+        this.gameStarted = true;
+        this.isPlaying = true;
+        this.isPaused = false;
+        this.startTimer();
+        this.showToast('游戏开始！点击空白格相邻的方块进行移动');
+    }
+
     checkWin() {
         const totalTiles = this.size * this.size;
-        
+
         for (let i = 0; i < totalTiles; i++) {
-            const expectedValue = (i === totalTiles - 1) ? 0 : i;
+            const expectedValue = (i === totalTiles - 1) ? 0 : i + 1;  // 修复：期望值应该是i+1
             if (this.tiles[i].value !== expectedValue) {
                 return false;
             }
@@ -421,6 +475,7 @@ class PuzzleGame {
         this.stopTimer();
         this.isPlaying = false;
         this.isPaused = false;
+        this.gameStarted = false;  // 重置游戏开始标志
         this.showWin();
         return true;
     }
@@ -515,6 +570,31 @@ class PuzzleGame {
 
     updateMoves() {
         document.getElementById('moves').textContent = this.moves;
+    }
+
+    // 新增：显示Toast提示
+    showToast(message) {
+        // 移除旧的toast
+        const oldToast = document.querySelector('.toast-message');
+        if (oldToast) {
+            oldToast.remove();
+        }
+
+        // 创建新的toast
+        const toast = document.createElement('div');
+        toast.className = 'toast-message';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        // 3秒后移除
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 300);
+        }, 2000);
     }
 }
 
